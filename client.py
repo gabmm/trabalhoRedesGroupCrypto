@@ -1,14 +1,17 @@
 import socket
 import threading
 import tkinter as tk
+import pickle
 from tkinter import messagebox
-from crypto_utils import generate_aes_key, encrypt, decrypt
+from crypto_utils import encrypt, decrypt
 
 
 class TicTacToeClient:
     def __init__(self, master):
         self.master = master
         self.master.title("Aguardando oponente")
+        self.key = None
+        self.iv = None
         self.buttons = []
         self.board = [" " for _ in range(9)]
         self.create_interface()
@@ -19,6 +22,14 @@ class TicTacToeClient:
         except ConnectionRefusedError:
             print("Falha na conexão. Certifique-se de que o servidor está em execução.")
             self.master.quit()
+        all_keys_encoded = self.client_socket.recv(1024)
+        deserialized_keys = pickle.loads(all_keys_encoded)
+
+        self.key = deserialized_keys[0]
+        self.iv = deserialized_keys[1]
+        print(self.key)
+        print(self.iv)
+        print(self.board)
         threading.Thread(target=self.receive_data).start()
 
     def create_interface(self):
@@ -32,9 +43,12 @@ class TicTacToeClient:
             self.buttons.append(row)
 
     def make_move(self, i, j):
+        print(self.board)
         move = i * 3 + j
         if self.board[move] == " " and self.symbol:
-            self.client_socket.send(str(move).encode())
+
+            self.client_socket.send(
+                encrypt(str(move).encode(), self.key, self.iv))
             print(f"Enviando movimento: {move}")
         elif self.board[move] != " ":
             messagebox.showwarning("Movimento inválido",
@@ -43,27 +57,32 @@ class TicTacToeClient:
     def receive_data(self):
         while True:
             try:
-                data = self.client_socket.recv(1024).decode()
-                print(f"Dados recebidos do servidor: {data}")
-                if data.startswith("YOUR_TURN"):
+                data = self.client_socket.recv(1024)
+                print(f"(criptografada): Dados recebidos do servidor: {data}")
+                data = decrypt(data, self.key, self.iv)
+                print(f"(descriptografada): Dados recebidos do servidor: {
+                      data}")
+                if data.startswith(b"YOUR_TURN"):
                     self.master.title("Sua vez")
                     self.symbol = data.split()[-1]
-                elif data.startswith("OPPONENT_TURN"):
+                elif data.startswith(b"OPPONENT_TURN"):
                     self.master.title("Vez do oponente")
-                elif data.startswith("YOU_WIN"):
+                elif data.startswith(b"YOU_WIN"):
                     messagebox.showinfo("Fim de Jogo", "Você venceu!")
                     self.master.quit()
-                elif data.startswith("YOU_LOSE"):
+                elif data.startswith(b"YOU_LOSE"):
                     messagebox.showinfo("Fim de Jogo", "Você perdeu!")
                     self.master.quit()
-                elif data.startswith("DRAW"):
+                elif data.startswith(b"DRAW"):
                     messagebox.showinfo("Fim de Jogo", "Empate!")
                     self.master.quit()
-                elif data.startswith("INVALID_MOVE"):
+                elif data.startswith(b"INVALID_MOVE"):
                     messagebox.showwarning(
                         "Movimento inválido", "Tente novamente!")
                 else:
-                    self.update_interface(data)
+                    # data = data.strip()
+                    data_str = data.decode()
+                    self.update_interface(data_str)
             except socket.error as e:
                 print(f"Erro de socket: {e}")
                 break

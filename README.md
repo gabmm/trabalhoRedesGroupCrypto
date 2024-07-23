@@ -8,9 +8,9 @@ Este projeto implementa um jogo da velha multiplayer com interface gráfica para
 =================
 * [Diretórios](#diretórios)
 * [Arquitetura](#arquitetura)
-     * [Servidor](#caso-1)
-     * [Jogador 1](#Jogador-1)
-     * [Jogador 2](#Jogador-2)
+     * [Servidor](#servidor)
+     * [Jogador 1](#jogador-1)
+     * [Jogador 2](#jogador-2)
 * [Instruções de uso](#instruções-de-uso)
 * [Interface gráfica](#interface-gráfica)
 * [Infraestrutura](#infraestrutura)
@@ -52,6 +52,7 @@ A aplicação é dividida em três partes principais:
   - Recebe as conexões dos jogadores e as armazena em uma lista.
   - Quando dois jogadores estão conectados, inicia o jogo:
     - Sorteia aleatoriamente qual jogador começa.
+    - Gera as chaves necessárias para a criptografia e envia para os jogadores.
     - Envia o estado do tabuleiro e a vez de jogar para cada jogador.
     - Recebe as jogadas dos jogadores, atualiza o estado do tabuleiro e verifica se há um vencedor ou empate.
     - Envia o resultado do jogo para os jogadores e fecha as conexões.
@@ -115,9 +116,9 @@ A infraestrutura do jogo da velha é composta por três componentes principais:
 
 1. **Servidor:** O servidor é o componente central do jogo. Ele é responsável por gerenciar o jogo e a comunicação com os jogadores.
 2. **Jogadores:** Os jogadores são os clientes que se conectam ao servidor para jogar o jogo.
-3. **Rede:** A rede é a infraestrutura que conecta o servidor e os jogadores. Ela pode ser uma rede local ou uma rede de internet.
+3. **Rede:** A rede é a infraestrutura que conecta o servidor e os jogadores.
 
 ## Considerações adicionais
 
 - O jogo da velha foi implementado em Python com a biblioteca Tkinter para criar a interface gráfica.
-- A criptografia AES foi usada para proteger a comunicação entre o servidor e os jogadores.
+- A criptografia AES foi usada no modo CBC (Cipher Block Chaining) para proteger a comunicação entre o servidor e os jogadores.

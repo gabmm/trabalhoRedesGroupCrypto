@@ -1,20 +1,25 @@
+# crypto_utils.py
+
 from Crypto.Cipher import AES
 from Crypto.Util.Padding import pad, unpad
-import os
+import secrets
 
 
-def generate_aes_key():
-    # Gera uma chave AES aleatória de 16 bytes.
-    return os.urandom(16)
+def generate_random_key():
+    return secrets.token_bytes(32)  # 256 bits (32 bytes)
+
+def generate_random_iv():
+    return secrets.token_bytes(16)  # 128 bits (16 bytes)
+
+def encrypt(message, key, IV):
+    encryptor = AES.new(key, AES.MODE_CBC, IV)
+    padded_message = pad(message, AES.block_size)
+    encrypted_message = encryptor.encrypt(padded_message)
+    return encrypted_message
 
 
-def encrypt(message, key):
-    encrypted = AES.new(key, AES.MODE_CBC, iv=os.urandom(16))
-    encrypted_text = encrypted.encrypt(pad(message.encode(), 16))
-    return  encrypted_text
-
-
-def decrypt(ciphertext, key):
-    decrypted = AES.new(key, AES.MODE_CBC, iv=os.urandom(16))
-    decrypted_text = unpad(decrypted.decrypt(ciphertext), 16).decode()
-    return decrypted_text
+def decrypt(cipher, key, IV):
+    decryptor = AES.new(key, AES.MODE_CBC, IV)
+    decrypted_padded_message = decryptor.decrypt(cipher)
+    decrypted_message = unpad(decrypted_padded_message, AES.block_size)
+    return decrypted_message

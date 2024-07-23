@@ -1,7 +1,8 @@
 import socket
+import pickle
 import threading
 import random
-from crypto_utils import generate_aes_key, encrypt, decrypt
+from crypto_utils import encrypt, decrypt, generate_random_iv, generate_random_key
 
 
 def check_winner(position):
@@ -25,33 +26,53 @@ def check_draw(position):
     return " " not in position
 
 
-def send_position(conn1, conn2, position):
+def send_position(conn1, conn2, position, all_Keys):
+    key = all_Keys[0]
+    iv = all_Keys[1]
     position_state = "".join(position)
+    mensage = position_state.encode()
+    encrypted_message = encrypt(mensage, key, iv)
     try:
-        conn1.send(position_state.encode())
-        conn2.send(position_state.encode())
+        conn1.send(encrypted_message)
+        conn2.send(encrypted_message)
+        # print(encrypted_message)
     except socket.error as e:
         print(f"Erro ao enviar o tabuleiro: {e}")
 
 
-def game_manager(conn1, conn2, all_connections):
+def game_manager(conn1, conn2, all_connections, all_Keys):
     positions = [" " for _ in range(9)]
     players = [conn1, conn2]
     symbols = ["X", "O"]
+    key = all_Keys[0]
+    iv = all_Keys[1]
     current_player = random.choice([0, 1])
 
-    send_position(conn1, conn2, positions)
+    send_position(conn1, conn2, positions, all_Keys)
     print("Tabuleiro inicial enviado aos jogadores.")
-
+    print(f"Tabuleiro atualizado: {positions}")
     while True:
         player = players[current_player]
         symbol = symbols[current_player]
 
         try:
-            player.send(f"YOUR_TURN {symbol}".encode())
-            players[1 - current_player].send("OPPONENT_TURN".encode())
-            move = player.recv(1024).decode()
-            print(f"Jogador {current_player +
+            message = f"YOUR_TURN Your symbol: {symbol}".encode()
+            encrypted_message = encrypt(message, key, iv)
+            player.send(encrypted_message)
+
+            message = f"OPPONENT_TURN Your symbol: {
+                symbols[1 - current_player]}".encode()
+            encrypted_message = encrypt(message, key, iv)
+            players[1 - current_player].send(encrypted_message)
+
+            move = player.recv(1024)
+
+            print(f"(criptografada): Jogador {current_player +
+                  1} ({symbol}) escolheu posição {move}.")
+
+            move = decrypt(move, key, iv).decode()
+
+            print(f"(descriptografada): Jogador {current_player +
                   1} ({symbol}) escolheu posição {move}.")
         except socket.error as e:
             print(f"Erro de socket: {e}")
@@ -60,31 +81,33 @@ def game_manager(conn1, conn2, all_connections):
         try:
             move = int(move)
             if move < 0 or move >= len(positions):
-                player.send("INVALID_MOVE".encode())
+
+                player.send(encrypt("INVALID_MOVE".encode(), key, iv))
                 print("Movimento inválido: índice fora do intervalo.")
                 continue
         except ValueError:
-            player.send("INVALID_MOVE".encode())
+            player.send(encrypt("INVALID_MOVE".encode(), key, iv))
             print("Movimento inválido: não é um número.")
             continue
 
         if positions[move] == " ":
             positions[move] = symbol
-            send_position(conn1, conn2, positions)
+            send_position(conn1, conn2, positions, all_Keys)
             print(f"Tabuleiro atualizado: {positions}")
             if check_winner(positions):
-                player.send("YOU_WIN".encode())
-                players[1 - current_player].send("YOU_LOSE".encode())
+                player.send(encrypt("YOU_WIN".encode(), key, iv))
+                players[1 -
+                        current_player].send(encrypt("YOU_LOSE".encode(), key, iv))
                 print(f"Jogador {current_player + 1} ({symbol}) venceu.")
                 break
             elif check_draw(positions):
-                conn1.send("DRAW".encode())
-                conn2.send("DRAW".encode())
+                conn1.send(encrypt("DRAW".encode(), key, iv))
+                conn2.send(encrypt("DRAW".encode(), key, iv))
                 print("Empate.")
                 break
             current_player = 1 - current_player
         else:
-            player.send("INVALID_MOVE".encode())
+            player.send(encrypt("INVALID_MOVE".encode(), key, iv))
             print("Movimento inválido: posição já ocupada.")
 
     conn1.close()
@@ -97,8 +120,18 @@ def handle_client(conn, addr, all_connections):
     all_connections.append(conn)
     if len(all_connections) == 2:
         print("Servidor inicializado! \nAguardando jogadores...")
+        key = generate_random_key()
+        iv = generate_random_iv()
+        all_Keys = [key, iv]
+        serialized_keys = pickle.dumps(all_Keys)
+        all_connections[0].send(serialized_keys)
+        all_connections[1].send(serialized_keys)
+        print(key)
+        print(iv)
+        print("Enviado as chaves para criptografia aos jogadores!")
+
         threading.Thread(target=game_manager, args=(
-            all_connections[0], all_connections[1], all_connections)).start()
+            all_connections[0], all_connections[1], all_connections, all_Keys)).start()
 
 
 def main():
