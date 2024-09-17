@@ -58,10 +58,11 @@ class TicTacToeClient:
         while True:
             try:
                 data = self.client_socket.recv(1024)
+                if len(data) <= 0:
+                    break
                 print(f"(criptografada): Dados recebidos do servidor: {data}")
                 data = decrypt(data, self.key, self.iv)
-                print(f"(descriptografada): Dados recebidos do servidor: {
-                      data}")
+                print(f"(descriptografada): Dados recebidos do servidor: {data}")
                 if data.startswith(b"YOUR_TURN"):
                     self.master.title("Sua vez")
                     self.symbol = data.split()[-1]
